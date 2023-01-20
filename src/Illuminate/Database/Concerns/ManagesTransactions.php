@@ -250,6 +250,9 @@ trait ManagesTransactions
      */
     public function rollBack($toLevel = null)
     {
+        // Execute the callbacks to release locks for jobs
+        $this->transactionsManager?->releaseJobs($this->getName());
+
         // We allow developers to rollback to a certain transaction level. We will verify
         // that this given transaction level is valid before attempting to rollback to
         // that level. If it's not we will just return out and not attempt anything.

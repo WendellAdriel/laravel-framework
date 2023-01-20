@@ -163,4 +163,27 @@ class DatabaseTransactionsManagerTest extends TestCase
         $this->assertCount(1, $callbacks);
         $this->assertEquals(['default', 1], $callbacks[0]);
     }
+
+    public function testRollbackCallbacksAreAddedToTheCurrentTransaction()
+    {
+        $callbacks = [];
+
+        $manager = (new DatabaseTransactionsManager);
+
+        $manager->begin('default', 1);
+
+        $manager->addRollbackCallback(function () use (&$callbacks) {
+        });
+
+        $manager->begin('default', 2);
+
+        $manager->begin('admin', 1);
+
+        $manager->addRollbackCallback(function () use (&$callbacks) {
+        });
+
+        $this->assertCount(1, $manager->getTransactions()[0]->getRollbackCallbacks());
+        $this->assertCount(0, $manager->getTransactions()[1]->getRollbackCallbacks());
+        $this->assertCount(1, $manager->getTransactions()[2]->getRollbackCallbacks());
+    }
 }

@@ -26,6 +26,13 @@ class DatabaseTransactionRecord
     protected $callbacks = [];
 
     /**
+     * The callbacks that should be executed on rollback.
+     *
+     * @var array
+     */
+    protected $rollbackCallbacks = [];
+
+    /**
      * Create a new database transaction record instance.
      *
      * @param  string  $connection
@@ -69,5 +76,38 @@ class DatabaseTransactionRecord
     public function getCallbacks()
     {
         return $this->callbacks;
+    }
+
+    /**
+     * Register a callback to be executed on rollback.
+     *
+     * @param  callable  $callback
+     * @return void
+     */
+    public function addRollbackCallback($callback)
+    {
+        $this->rollbackCallbacks[] = $callback;
+    }
+
+    /**
+     * Execute all the rollback callbacks.
+     *
+     * @return void
+     */
+    public function executeRollbackCallbacks()
+    {
+        foreach ($this->rollbackCallbacks as $callback) {
+            $callback();
+        }
+    }
+
+    /**
+     * Get all the rollback callbacks.
+     *
+     * @return array
+     */
+    public function getRollbackCallbacks()
+    {
+        return $this->rollbackCallbacks;
     }
 }

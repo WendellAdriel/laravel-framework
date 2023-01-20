@@ -4,12 +4,15 @@ namespace Illuminate\Events;
 
 use Closure;
 use Exception;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Broadcasting\Factory as BroadcastFactory;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Contracts\Container\Container as ContainerContract;
 use Illuminate\Contracts\Events\Dispatcher as DispatcherContract;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -545,6 +548,14 @@ class Dispatcher implements DispatcherContract
                     $listener->$method(...$payload);
                 }
             );
+
+            if ($listener instanceof ShouldBeUniqueUntilProcessing) {
+                $this->container->make('db.transactions')->addRollbackCallback(
+                    function () use ($listener) {
+                        (new UniqueLock($this->container->make(Cache::class)))->release($listener);
+                    }
+                );
+            }
         };
     }
 

@@ -66,6 +66,19 @@ class DatabaseTransactionsManager
      * @param  string  $connection
      * @return void
      */
+    public function releaseJobs($connection)
+    {
+        $forThisConnection = $this->transactions->filter(fn ($transaction) => $transaction->connection == $connection);
+
+        $forThisConnection->map->executeRollbackCallbacks();
+    }
+
+    /**
+     * Commit the active database transaction.
+     *
+     * @param  string  $connection
+     * @return void
+     */
     public function commit($connection)
     {
         [$forThisConnection, $forOtherConnections] = $this->transactions->partition(
@@ -91,6 +104,21 @@ class DatabaseTransactionsManager
     {
         if ($current = $this->callbackApplicableTransactions()->last()) {
             return $current->addCallback($callback);
+        }
+
+        $callback();
+    }
+
+    /**
+     * Register a transaction callback.
+     *
+     * @param  callable  $callback
+     * @return void
+     */
+    public function addRollbackCallback($callback)
+    {
+        if ($current = $this->callbackApplicableTransactions()->last()) {
+            return $current->addRollbackCallback($callback);
         }
 
         $callback();

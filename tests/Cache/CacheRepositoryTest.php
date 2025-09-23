@@ -479,6 +479,90 @@ class CacheRepositoryTest extends TestCase
         $this->assertTrue($repo->touch($key, DateInterval::createFromDateString("$ttl seconds")));
     }
 
+    public function testLockAndRememberSuccessfullyAcquiresLockAndRemembersValue()
+    {
+        $store = new ArrayStore();
+        $repository = new Repository($store);
+        $key = 'lock-and-remember-success';
+
+        $value = $repository->lockAndRemember($key, 5, 5, 300, function () {
+            return 'computed-value';
+        });
+
+        $this->assertSame('computed-value', $value);
+        $this->assertSame('computed-value', $repository->get($key));
+    }
+
+    public function testLockAndRememberUsesExistingCachedValue()
+    {
+        $store = new ArrayStore();
+        $repository = new Repository($store);
+        $key = 'lock-and-remember-cached';
+        $repository->put($key, 'existing-value', 300);
+
+        $callbackCalled = false;
+        $value = $repository->lockAndRemember($key, 5, 5, 300, function () use (&$callbackCalled) {
+            $callbackCalled = true;
+
+            return 'new-value';
+        });
+
+        $this->assertSame('existing-value', $value);
+        $this->assertFalse($callbackCalled, 'Callback should not be called when value exists in cache');
+    }
+
+    public function testLockAndRememberThrowsExceptionOnLockTimeout()
+    {
+        $this->expectException(\Illuminate\Contracts\Cache\LockTimeoutException::class);
+
+        $store = new ArrayStore();
+        $repository = new Repository($store);
+        $key = 'lock-and-remember-timeout';
+        $lockName = 'lock:'.$key;
+
+        // Hold the lock first
+        $lock = $repository->lock($lockName, 10);
+        $lock->acquire();
+
+        try {
+            // Try to lock and remember with a 0 second timeout - should throw exception immediately
+            $repository->lockAndRemember($key, 5, 0, 300, function () {
+                return 'should-not-run';
+            });
+        } finally {
+            $lock->forceRelease();
+        }
+    }
+
+    public function testLockAndRememberWorksWithDifferentTtlTypes()
+    {
+        Carbon::setTestNow(Carbon::parse(self::getTestDate()));
+        
+        $store = new ArrayStore();
+        $repository = new Repository($store);
+        $key = 'lock-and-remember-ttl-types';
+
+        // Test with DateInterval
+        $repository->lockAndRemember($key, 5, 5, new DateInterval('PT10S'), function () {
+            return 'interval-value';
+        });
+        $this->assertSame('interval-value', $repository->get($key));
+        $repository->forget($key);
+
+        // Test with Carbon instance
+        $repository->lockAndRemember($key, 5, 5, Carbon::now()->addSeconds(10), function () {
+            return 'carbon-value';
+        });
+        $this->assertSame('carbon-value', $repository->get($key));
+        $repository->forget($key);
+
+        // Test with integer seconds
+        $repository->lockAndRemember($key, 5, 5, 10, function () {
+            return 'seconds-value';
+        });
+        $this->assertSame('seconds-value', $repository->get($key));
+    }
+
     protected function getRepository()
     {
         $dispatcher = new Dispatcher(m::mock(Container::class));

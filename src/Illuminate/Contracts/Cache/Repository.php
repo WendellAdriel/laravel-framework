@@ -100,13 +100,21 @@ interface Repository extends CacheInterface
     public function rememberForever($key, Closure $callback);
 
     /**
-     * Set the expiration of a cached item; null TTL will retain the item forever.
+     * Get an item from the cache, or execute the given Closure and store the result.
+     * Uses a lock to prevent cache stampede.
+     *
+     * @template TCacheValue
      *
      * @param  string  $key
-     * @param  \DateTimeInterface|\DateInterval|int|null  $ttl
-     * @return bool
+     * @param  int  $lockTtl
+     * @param  int  $blockTtl
+     * @param  \DateTimeInterface|\DateInterval|int|null  $cacheTtl
+     * @param  \Closure(): TCacheValue  $callback
+     * @return TCacheValue
+     *
+     * @throws \Illuminate\Contracts\Cache\LockTimeoutException
      */
-    public function touch($key, $ttl = null);
+    public function lockAndRemember($key, $lockTtl, $blockTtl, $cacheTtl, Closure $callback);
 
     /**
      * Remove an item from the cache.
@@ -115,6 +123,15 @@ interface Repository extends CacheInterface
      * @return bool
      */
     public function forget($key);
+
+    /**
+     * Update the item's time-to-live in the cache.
+     *
+     * @param  string  $key
+     * @param  \DateTimeInterface|\DateInterval|int|null  $ttl
+     * @return bool
+     */
+    public function touch($key, $ttl = null);
 
     /**
      * Get the cache store implementation.
